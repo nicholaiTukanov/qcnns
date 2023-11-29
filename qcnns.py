@@ -1,13 +1,18 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import math
+import time
+
+import torch
 
 from IPython.display import clear_output
 
 import qiskit
 from qiskit.quantum_info import SparsePauliOp
+from qiskit_algorithms.utils import algorithm_globals
 from qiskit_machine_learning.algorithms.classifiers import NeuralNetworkClassifier
 from qiskit_machine_learning.neural_networks import EstimatorQNN
+from qiskit_machine_learning.connectors import TorchConnector
 
 import qiskit_algorithms.optimizers as qiskit_optimizers
 
@@ -114,26 +119,45 @@ def make_qcnn(num_qubits, name, feature_map):
     return circ, qcnn_estimator
     
     
-objective_func_vals = []
-plt.title("Objective function value against iteration")
-plt.xlabel("Iteration")
-plt.ylabel("Objective function value")
-hl, = plt.plot([], [])
-
-def callback_graph(weights, obj_func_eval):
-    # clear_output(wait=True)
-    # objective_func_vals.append(obj_fu nc_eval)
-    # plt.plot(range(len(objective_func_vals)), objective_func_vals)
-    hl.set_xdata(np.append(hl.get_xdata(), len(objective_func_vals)))
-    hl.set_ydata(np.append(hl.get_ydata(), obj_func_eval))
-    plt.draw()
+def train_torch_qcnn(qcnn_estimator, initial_weights, train_data, train_labels):
+    torch_model = TorchConnector(qcnn_estimator, initial_weights)
+    optimizer = torch.optim.Adam(torch_model.parameters(), lr=0.1)
+    loss = torch.nn.MSELoss()
+    torch_train_data = torch.tensor(train_data, dtype=torch.float)
+    torch_train_labels = torch.tensor(train_labels, dtype=torch.float)
+    torch_model.train()
+    batch_size = 10
+    for i in range(0, len(torch_train_data), batch_size):
+        optimizer.zero_grad()
+        output = torch_model(torch_train_data[i:i+batch_size])
+        loss_val = loss(output, torch_train_labels[i:i+batch_size])
+        loss_val.backward()
+        optimizer.step()
+        print(f"Loss value: {loss_val}")
+    return torch_model
     
-# def plot_graph():
-#     plt.title("Objective function value against iteration")
-#     plt.xlabel("Iteration")
-#     plt.ylabel("Objective function value")
-#     plt.plot(range(len(objective_func_vals)), objective_func_vals)
-#     plt.show()
+def test_torch_qcnn(torch_qcnn, test_data, test_labels):
+    torch_test_data = torch.tensor(test_data, dtype=torch.float)
+    # torch_test_labels = torch.tensor(test_labels, dtype=torch.float)
+    torch_qcnn.eval()
+    pred = []
+    for i in range(len(torch_test_data)):
+        output = torch_qcnn(torch_test_data[i])
+        pred.append(np.sign(output.detach().numpy())[0])
+    accuracy = sum(np.asarray(pred) == np.asarray(test_labels)) / len(test_labels)
+    print(f"Accuracy from the test data : {np.round(100 * accuracy, 2)}%")
+    
+objective_func_vals = []
+def callback_graph(weights, obj_func_eval):
+    objective_func_vals.append(obj_func_eval)
+    
+def plot_graph():
+    plt.rcParams["figure.figsize"] = (12, 6)
+    plt.title("Objective function value against iteration")
+    plt.xlabel("Iteration")
+    plt.ylabel("Objective function value")
+    plt.plot(range(len(objective_func_vals)), objective_func_vals)
+    plt.show()
     
 def train_qcnn(qnn_estimator, optimizer, callback_fn, data, labels):
     classifier = NeuralNetworkClassifier(
@@ -141,12 +165,21 @@ def train_qcnn(qnn_estimator, optimizer, callback_fn, data, labels):
         optimizer=optimizer,
         callback=callback_fn
     )
-    plt.rcParams["figure.figsize"] = (12, 6)
-    plt.show(block = False)
-    classifier.fit(np.asarray(data), np.asarray(labels))
-    print(f"Accuracy from the train data : {np.round(100 * classifier.score(data, labels), 2)}%")
     
+    s = time.time()
+    classifier.fit(np.asarray(data), np.asarray(labels))
+    e = time.time()
+    
+    print(f"Accuracy from the train data : {np.round(100 * classifier.score(data, labels), 2)}%")
+    print(f"Training time: {np.round(e - s, 2)}")
+    plot_graph()
     return classifier
+
+def test_qcnn(classifier, test_data, test_labels):
+    # test_predictions = classifier.predict(test_data)
+    test_data_np = np.asarray(test_data)
+    test_labels_np = np.asarray(test_labels)
+    print(f"Accuracy from the test data : {np.round(100 * classifier.score(test_data_np, test_labels_np), 2)}%")
 
 if __name__ == "__main__":
     
@@ -157,7 +190,7 @@ if __name__ == "__main__":
     
     image_h, image_w = 4, 2
     assert(image_h * image_w == max_qubits)
-    data, labels = generate_dataset(100, image_h, image_w, 2)
+    data, labels = generate_dataset(10000, image_h, image_w, 2)
     train_data, test_data, train_labels, test_labels = train_test_split(
         data, labels, test_size=0.3
     )
@@ -172,10 +205,15 @@ if __name__ == "__main__":
     # plt.subplots_adjust(wspace=0.1, hspace=0.025)
     # plt.show()
     
-    classifier = train_qcnn(
-        qcnn_estimator, 
-        qiskit_optimizers.COBYLA(maxiter=100), 
-        callback_graph, 
-        train_data, train_labels
-    )
+    # classifier = train_qcnn(
+    #     qcnn_estimator, 
+    #     qiskit_optimizers.COBYLA(maxiter=1000), 
+    #     callback_graph, 
+    #     train_data, train_labels
+    # )
+    
+    # test_qcnn(classifier, test_data, test_labels)
+    initial_weights = 0.1 * (2 * algorithm_globals.random.random(qcnn_estimator.num_weights) - 1)
+    torch_model = train_torch_qcnn(qcnn_estimator, initial_weights, train_data, train_labels)
+    test_torch_qcnn(torch_model, test_data, test_labels)
     
