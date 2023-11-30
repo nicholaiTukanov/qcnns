@@ -53,14 +53,25 @@ def conv_layer(num_qubits, param_prefix):
     qc.append(qc_inst, qubits)
     return qc
 
+# def pool_circuit(params):
+#     target = qiskit.QuantumCircuit(2)
+#     target.rz(-np.pi / 2, 1)
+#     target.cx(1, 0)
+#     target.rz(params[0], 0)
+#     target.ry(params[1], 1)
+#     target.cx(0, 1)
+#     target.ry(params[2], 1)
+#     return target
 def pool_circuit(params):
     target = qiskit.QuantumCircuit(2)
-    target.rz(-np.pi / 2, 1)
-    target.cx(1, 0)
-    target.rz(params[0], 0)
-    target.ry(params[1], 1)
-    target.cx(0, 1)
-    target.ry(params[2], 1)
+    # Modified and added quantum gates
+    target.h(0)  # Hadamard gate on qubit 0
+    target.rx(params[0], 0)  # Rotation around X-axis for qubit 0
+    target.rz(params[1], 1)  # Rotation around Z-axis for qubit 1
+    target.cx(0, 1)  # CNOT gate with control qubit 0 and target qubit 1
+    target.ry(params[2], 0)  # Rotation around Y-axis for qubit 0
+    target.cx(1, 0)  # CNOT gate with control qubit 1 and target qubit 0
+
     return target
 
 def pool_layer(sources, sinks, param_prefix):
@@ -190,7 +201,7 @@ if __name__ == "__main__":
     
     image_h, image_w = 4, 2
     assert(image_h * image_w == max_qubits)
-    data, labels = generate_dataset(10000, image_h, image_w, 2)
+    data, labels = generate_dataset(1000, image_h, image_w, 2)
     train_data, test_data, train_labels, test_labels = train_test_split(
         data, labels, test_size=0.3
     )
