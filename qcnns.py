@@ -4,6 +4,7 @@ import math
 import time
 
 import torch
+from torch.utils.data import DataLoader
 
 from IPython.display import clear_output
 
@@ -119,21 +120,28 @@ def make_qcnn(num_qubits, name, feature_map):
     return circ, qcnn_estimator
     
     
-def train_torch_qcnn(qcnn_estimator, initial_weights, train_data, train_labels):
+def train_torch_qcnn(qcnn_estimator, initial_weights, train_loader):
     torch_model = TorchConnector(qcnn_estimator, initial_weights)
-    optimizer = torch.optim.Adam(torch_model.parameters(), lr=0.1)
+    optimizer = torch.optim.Adam(torch_model.parameters(), lr=0.01)
     loss = torch.nn.MSELoss()
-    torch_train_data = torch.tensor(train_data, dtype=torch.float)
-    torch_train_labels = torch.tensor(train_labels, dtype=torch.float)
     torch_model.train()
-    batch_size = 10
-    for i in range(0, len(torch_train_data), batch_size):
-        optimizer.zero_grad()
-        output = torch_model(torch_train_data[i:i+batch_size])
-        loss_val = loss(output, torch_train_labels[i:i+batch_size])
-        loss_val.backward()
-        optimizer.step()
-        print(f"Loss value: {loss_val}")
+    loss_list = []
+    epochs = 10
+    for epoch in range(epochs):
+        total_loss = []
+        for bidx, (data, label) in enumerate(train_loader):
+            optimizer.zero_grad(set_to_none=True)
+            output = torch_model(data)
+            loss_val = loss(
+                output.float(), 
+                label.float()
+            )
+            loss_val.backward()
+            optimizer.step()
+            total_loss.append(loss_val.item())
+            # print(f"Loss from batch {bidx} : {loss_val.item()}", end="\r")
+        loss_list.append(sum(total_loss) / len(total_loss))
+        print("Training [{:.0f}%]\tLoss: {:.4f}".format(100.0 * (epoch + 1) / epochs, loss_list[-1]))
     return torch_model
     
 def test_torch_qcnn(torch_qcnn, test_data, test_labels):
@@ -190,7 +198,8 @@ if __name__ == "__main__":
     
     image_h, image_w = 4, 2
     assert(image_h * image_w == max_qubits)
-    data, labels = generate_dataset(10000, image_h, image_w, 2)
+    data, labels = generate_dataset(1000, image_h, image_w, 2)
+    labels = [1 if label == 1 else 0 for label in labels]
     train_data, test_data, train_labels, test_labels = train_test_split(
         data, labels, test_size=0.3
     )
@@ -214,6 +223,9 @@ if __name__ == "__main__":
     
     # test_qcnn(classifier, test_data, test_labels)
     initial_weights = 0.1 * (2 * algorithm_globals.random.random(qcnn_estimator.num_weights) - 1)
-    torch_model = train_torch_qcnn(qcnn_estimator, initial_weights, train_data, train_labels)
+    BATCH = 10
+    train_loader = DataLoader(list(zip(train_data, train_labels)), batch_size=BATCH, shuffle=True)
+    torch_model = train_torch_qcnn(qcnn_estimator, initial_weights, train_loader)
+    
     test_torch_qcnn(torch_model, test_data, test_labels)
     
