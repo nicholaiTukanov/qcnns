@@ -201,7 +201,7 @@ if __name__ == "__main__":
     
     image_h, image_w = 4, 2
     assert(image_h * image_w == max_qubits)
-    data, labels = generate_dataset(1000, image_h, image_w, 2)
+    data, labels = generate_dataset(10000, image_h, image_w, 2)
     train_data, test_data, train_labels, test_labels = train_test_split(
         data, labels, test_size=0.3
     )
