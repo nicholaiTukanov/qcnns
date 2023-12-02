@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import math
 import time
+import pickle
 
 import torch
 import torch.nn as nn
@@ -163,7 +164,7 @@ if __name__ == "__main__":
     max_qubits = 8
     image_h, image_w = 2, 4
     assert(image_h * image_w == max_qubits)
-    data, labels = generate_dataset(200, image_h, image_w, 2)
+    data, labels = generate_dataset(300, image_h, image_w, 2)
     train_data, test_data, train_labels, test_labels = train_test_split(data, labels, test_size=0.3)
     print(f"Generated dataset with {len(data)} images")
     
@@ -201,10 +202,15 @@ if __name__ == "__main__":
         print(f"Trained with {name} weights")
         test_qcnn(qcnn_classifier, test_data, test_labels)
     
+    optimizer = "COBYLA"
+    loss = "Cross Entropy"
+    with open(f"obj_fn_vals_{optimizer}_{loss}.pickle", "wb") as f:
+        pickle.dump(obj_fn_vals, f)
+    
     plt.rcParams["figure.figsize"] = (12, 6)
-    plt.title("Objective function value against iteration")
-    plt.xlabel("Iteration")
-    plt.ylabel("Objective function value")
+    plt.title(f"{loss} function values against iterations")
+    plt.xlabel("Iterations")
+    plt.ylabel("Loss")
     x = range(len(obj_fn_vals["zeros"]))
     for name, obj_fn_val in obj_fn_vals.items():
         plt.plot(x, obj_fn_val, label=name)
