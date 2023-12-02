@@ -63,4 +63,5 @@ def generate_dataset(num_images, image_height, image_width, stroke_length):
         for i in range(image_width):
             if images[-1][i] == 0:
                 images[-1][i] = algorithm_globals.random.uniform(0, np.pi / 4)
-    return images, labels
+                
+    return np.array(images), np.array(labels)
