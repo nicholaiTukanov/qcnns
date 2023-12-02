@@ -3,6 +3,9 @@ import numpy as np
 import math
 import time
 
+import torch
+import torch.nn as nn
+
 import qiskit
 from qiskit.utils import QuantumInstance
 from qiskit.quantum_info import SparsePauliOp
@@ -108,7 +111,6 @@ def make_qcnn(num_qubits, name, feature_map):
     # we decompose the circuit for the QNN to avoid additional data copying
     qcnn_estimator = EstimatorQNN(
         circuit=circ.decompose(),
-        estimator=BackendEstimator(AerSimulator(method="statevector", device="GPU")),
         input_params=feature_map.parameters,
         weight_params=qcnn.parameters,
     )
@@ -127,13 +129,15 @@ def callback_graph(weights, obj_func_eval):
 #     plt.plot(range(len(objective_func_vals)), objective_func_vals)
 #     plt.show()
     
-def train_qcnn(qnn_estimator, optimizer, callback_fn, data, labels, init_weights, init_name=None):
+obj_fn_vals = {}
+def train_qcnn(qnn_estimator, optimizer, callback_fn, data, labels, init_weights, init_name):
     
     if init_weights is None:
         init_weights = np.random.rand(qnn_estimator.num_weights)
         
     classifier = NeuralNetworkClassifier(
         qnn_estimator,
+        loss="cross_entropy",
         optimizer=optimizer,
         callback=callback_fn,
         initial_point=init_weights
@@ -145,7 +149,8 @@ def train_qcnn(qnn_estimator, optimizer, callback_fn, data, labels, init_weights
     
     print(f"Accuracy from the train data : {np.round(100 * classifier.score(data, labels), 2)}%")
     print(f"Training time: {np.round(e - s, 2)}")
-    # np.save(f"{init_name}_obj.npy", np.array(objective_func_vals))
+    obj_fn_vals[init_name] = np.array(objective_func_vals).copy()
+    objective_func_vals.clear()
     return classifier
 
 def test_qcnn(classifier, test_data, test_labels):
@@ -156,37 +161,52 @@ def test_qcnn(classifier, test_data, test_labels):
 if __name__ == "__main__":
     
     max_qubits = 8
+    image_h, image_w = 2, 4
+    assert(image_h * image_w == max_qubits)
+    data, labels = generate_dataset(200, image_h, image_w, 2)
+    train_data, test_data, train_labels, test_labels = train_test_split(data, labels, test_size=0.3)
+    print(f"Generated dataset with {len(data)} images")
+    
     feat_map = qiskit.circuit.library.ZFeatureMap(max_qubits)
     
     circ_qcnn, qcnn_estimator = make_qcnn(max_qubits, "QCNN", feat_map)
     print(f"Made QCNN using {max_qubits} qubits")
     
-    image_h, image_w = 2, 4
-    assert(image_h * image_w == max_qubits)
-    data, labels = generate_dataset(200, image_h, image_w, 2)
-    train_data, test_data, train_labels, test_labels = train_test_split(
-        data, labels, test_size=0.5
-    )
-    print(f"Generated dataset with {len(data)} images")
+    init_weights_zeros = np.zeros(qcnn_estimator.num_weights)
+    init_weights_ones = np.ones(qcnn_estimator.num_weights)
+    init_weights_xaiver = nn.init.xavier_uniform_(torch.empty(qcnn_estimator.num_weights,1)).numpy().flatten()
+    init_weights_constant = nn.init.constant_(torch.empty(qcnn_estimator.num_weights), 1/qcnn_estimator.num_weights).numpy()
+    init_weights_uniform = nn.init.uniform_(torch.empty(qcnn_estimator.num_weights)).numpy()
+    init_weights_normal = nn.init.normal_(torch.empty(qcnn_estimator.num_weights)).numpy()
     
-    print("Training QCNN")
-    qcnn_classifier = train_qcnn(
-        qcnn_estimator, 
-        qiskit_optimizers.COBYLA(maxiter=100), 
-        callback_graph,
-        train_data, train_labels, 
-        None
-    )
-    print("Trained QCNN")
+    init_weights = {
+        "zeros": init_weights_zeros, 
+        "ones": init_weights_ones,
+        "xavier": init_weights_xaiver,
+        "constant": init_weights_constant,
+        "uniform": init_weights_uniform, 
+        "normal": init_weights_normal
+    }
     
-    test_qcnn(qcnn_classifier, test_data, test_labels)
+    for name, weights in init_weights.items():
+        print(f"Training with {name} weights")
+        qcnn_classifier = train_qcnn(
+            qcnn_estimator, 
+            qiskit_optimizers.COBYLA(maxiter=200), 
+            callback_graph,
+            train_data, train_labels, 
+            weights,
+            name
+        )
+        print(f"Trained with {name} weights")
+        test_qcnn(qcnn_classifier, test_data, test_labels)
     
-    # init_weights_zeros = np.zeros(qcnn_estimator.num_weights)
-    # init_weights_random = np.random.rand(qcnn_estimator.num_weights)
-    # init_weights_ones = np.ones(qcnn_estimator.num_weights)
-    # init_weights_uniform = np.random.uniform(0, 1, qcnn_estimator.num_weights)
-    # init_weights_normal = np.random.normal(0, 1, qcnn_estimator.num_weights)
-    
-    
-    
-    
+    plt.rcParams["figure.figsize"] = (12, 6)
+    plt.title("Objective function value against iteration")
+    plt.xlabel("Iteration")
+    plt.ylabel("Objective function value")
+    x = range(len(obj_fn_vals["zeros"]))
+    for name, obj_fn_val in obj_fn_vals.items():
+        plt.plot(x, obj_fn_val, label=name)
+    plt.legend()
+    plt.show()
