@@ -21,8 +21,6 @@ from sklearn.model_selection import train_test_split
 
 from img_gen import generate_dataset
 
-from alternative_convolution_pooling_circuit import conv_circuit2, pool_circuit2
-
 # using qiskit tutorial to build a convolutional quantum circuit
 def conv_circuit(params):
     circ = qiskit.QuantumCircuit(2)
@@ -43,12 +41,10 @@ def conv_layer(num_qubits, param_prefix):
     params = qiskit.circuit.ParameterVector(param_prefix, length=num_qubits * 3)
     for q1, q2 in zip(qubits[0::2], qubits[1::2]):
         qc = qc.compose(conv_circuit(params[param_index : (param_index + 3)]), [q1, q2])
-        # qc = qc.compose(conv_circuit2(params[param_index : (param_index + 3)]), [q1, q2])
         qc.barrier()
         param_index += 3
     for q1, q2 in zip(qubits[1::2], qubits[2::2] + [0]):
         qc = qc.compose(conv_circuit(params[param_index : (param_index + 3)]), [q1, q2])
-        # qc = qc.compose(conv_circuit2(params[param_index : (param_index + 3)]), [q1, q2])
         qc.barrier()
         param_index += 3
 
@@ -58,25 +54,14 @@ def conv_layer(num_qubits, param_prefix):
     qc.append(qc_inst, qubits)
     return qc
 
-# def pool_circuit(params):
-#     target = qiskit.QuantumCircuit(2)
-#     target.rz(-np.pi / 2, 1)
-#     target.cx(1, 0)
-#     target.rz(params[0], 0)
-#     target.ry(params[1], 1)
-#     target.cx(0, 1)
-#     target.ry(params[2], 1)
-#     return target
 def pool_circuit(params):
     target = qiskit.QuantumCircuit(2)
-    # Modified and added quantum gates
-    target.h(0)  # Hadamard gate on qubit 0
-    target.rx(params[0], 0)  # Rotation around X-axis for qubit 0
-    target.rz(params[1], 1)  # Rotation around Z-axis for qubit 1
-    target.cx(0, 1)  # CNOT gate with control qubit 0 and target qubit 1
-    target.ry(params[2], 0)  # Rotation around Y-axis for qubit 0
-    target.cx(1, 0)  # CNOT gate with control qubit 1 and target qubit 0
-
+    target.rz(-np.pi / 2, 1)
+    target.cx(1, 0)
+    target.rz(params[0], 0)
+    target.ry(params[1], 1)
+    target.cx(0, 1)
+    target.ry(params[2], 1)
     return target
 
 def pool_layer(sources, sinks, param_prefix):
@@ -86,7 +71,6 @@ def pool_layer(sources, sinks, param_prefix):
     params = qiskit.circuit.ParameterVector(param_prefix, length=num_qubits // 2 * 3)
     for source, sink in zip(sources, sinks):
         qc = qc.compose(pool_circuit(params[param_index : (param_index + 3)]), [source, sink])
-        # qc = qc.compose(pool_circuit2(params[param_index : (param_index + 3)]), [source, sink])
         qc.barrier()
         param_index += 3
     qc_inst = qc.to_instruction()
