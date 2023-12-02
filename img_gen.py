@@ -56,12 +56,23 @@ def generate_dataset(num_images, image_height, image_width, stroke_length):
     #     print("\n")
 
     for n in range(num_images):
-        rng = algorithm_globals.random.integers(0, 2)
-        if rng == 0:
+        # rng = algorithm_globals.random.integers(0, 2)
+        # if rng == 0:
+        #     labels.append(-1)
+        #     random_image = algorithm_globals.random.integers(0, number_of_patterns)
+        #     images.append(np.array(fwd_array[random_image]))
+        # elif rng == 1:
+        #     labels.append(1)
+        #     random_image = algorithm_globals.random.integers(0, number_of_patterns)
+        #     images.append(np.array(bkwd_array[random_image]))
+
+        if (n < num_images / 2):
+            # first half are 0's
             labels.append(-1)
             random_image = algorithm_globals.random.integers(0, number_of_patterns)
             images.append(np.array(fwd_array[random_image]))
-        elif rng == 1:
+        else:
+            # second half are 1's
             labels.append(1)
             random_image = algorithm_globals.random.integers(0, number_of_patterns)
             images.append(np.array(bkwd_array[random_image]))
