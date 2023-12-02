@@ -78,10 +78,10 @@ def generate_dataset(num_images, image_height, image_width, stroke_length):
             images.append(np.array(bkwd_array[random_image]))
 
         # Create noise
-        for i in range(image_width):
+        for i in range(image_width*image_height):
             if images[-1][i] == 0:
                 images[-1][i] = algorithm_globals.random.uniform(0, np.pi / 4)
-    return images, labels
+    return np.array(images), np.array(labels)
 
 def import_MNIST_Torch(num_samples, final_img_size):
     # extract the dataset from pytorch API
