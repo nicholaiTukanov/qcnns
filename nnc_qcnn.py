@@ -22,6 +22,8 @@ import qiskit_algorithms.optimizers as qiskit_optimizers
 from sklearn.model_selection import train_test_split
 
 from img_gen import generate_dataset
+from alternative_convolution_pooling_circuit import conv_circuit2
+from poolinglayermodified import alternative_pool_circuit
 
 
 # using qiskit tutorial to build a convolutional quantum circuit
@@ -43,11 +45,13 @@ def conv_layer(num_qubits, param_prefix):
     param_index = 0
     params = qiskit.circuit.ParameterVector(param_prefix, length=num_qubits * 3)
     for q1, q2 in zip(qubits[0::2], qubits[1::2]):
-        qc = qc.compose(conv_circuit(params[param_index : (param_index + 3)]), [q1, q2])
+        qc = qc.compose(conv_circuit2(params[param_index : (param_index + 3)]), [q1, q2])
+        # qc = qc.compose(conv_circuit(params[param_index : (param_index + 3)]), [q1, q2])
         qc.barrier()
         param_index += 3
     for q1, q2 in zip(qubits[1::2], qubits[2::2] + [0]):
-        qc = qc.compose(conv_circuit(params[param_index : (param_index + 3)]), [q1, q2])
+        # qc = qc.compose(conv_circuit(params[param_index : (param_index + 3)]), [q1, q2])
+        qc = qc.compose(conv_circuit2(params[param_index : (param_index + 3)]), [q1, q2])
         qc.barrier()
         param_index += 3
 
@@ -73,7 +77,8 @@ def pool_layer(sources, sinks, param_prefix):
     param_index = 0
     params = qiskit.circuit.ParameterVector(param_prefix, length=num_qubits // 2 * 3)
     for source, sink in zip(sources, sinks):
-        qc = qc.compose(pool_circuit(params[param_index : (param_index + 3)]), [source, sink])
+        # qc = qc.compose(pool_circuit(params[param_index : (param_index + 3)]), [source, sink])
+        qc = qc.compose(alternative_pool_circuit(params[param_index : (param_index + 3)]), [source, sink])
         qc.barrier()
         param_index += 3
     qc_inst = qc.to_instruction()
