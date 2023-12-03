@@ -193,7 +193,7 @@ if __name__ == "__main__":
         print(f"Training with {name} weights")
         qcnn_classifier = train_qcnn(
             qcnn_estimator, 
-            qiskit_optimizers.COBYLA(maxiter=200), 
+            qiskit_optimizers.COBYLA(maxiter=200, rhobeg=0.5), 
             callback_graph,
             train_data, train_labels, 
             weights,
@@ -204,11 +204,11 @@ if __name__ == "__main__":
     
     optimizer = "COBYLA"
     loss = "Cross Entropy"
-    with open(f"obj_fn_vals_{optimizer}_{loss}.pickle", "wb") as f:
+    with open(f"obj_fn_vals_{optimizer}_{loss}_2.pickle", "wb") as f:
         pickle.dump(obj_fn_vals, f)
     
     plt.rcParams["figure.figsize"] = (12, 6)
-    plt.title(f"{loss} function values against iterations")
+    plt.title(f"{loss} values using {optimizer} over iterations")
     plt.xlabel("Iterations")
     plt.ylabel("Loss")
     x = range(len(obj_fn_vals["zeros"]))
